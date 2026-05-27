@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: "zfs_tuning"
+  namespace: "none"
+  author: "Denis Pershev <dpershev@napaster.ru>"
+  description: "Apply ZFS pool/dataset properties (compression, atime, xattr, autotrim) + enable scrub/trim systemd timers"
+  license: "MIT"
+  min_ansible_version: "3.0.0"
+  platforms:
+    - name: "ArchLinux"
+      versions:
+        - 'all'
+    - name: "Debian"
+      versions:
+        - 'all'
+    - name: "EL"
+      versions:
+        - 'all'
+dependencies: []

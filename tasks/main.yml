@@ -1,0 +1,75 @@
+---
+- name: 'zfs_tuning | Skip if no pools configured for this host'
+  ansible.builtin.meta: end_host
+  when: zfs_tuning_pools | length == 0
+
+- name: 'zfs_tuning | Sanity — pool exists on host'
+  ansible.builtin.command: 'zpool list -H -o name {{ item.name }}'
+  register: zfs_tuning_pool_check
+  changed_when: false
+  failed_when: zfs_tuning_pool_check.rc != 0
+  loop: "{{ zfs_tuning_pools }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: 'zfs_tuning | Apply filesystem properties (compression / atime / xattr / acltype / etc) via `zfs set`'
+  community.general.zfs:
+    name: "{{ item.name }}"
+    state: present
+    extra_zfs_properties: "{{ item.properties | default({}) }}"
+  loop: "{{ zfs_tuning_pools }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: (item.properties | default({})) | length > 0
+
+# Pool-уровень properties (`zpool set` — autotrim, ashift и т.п.).
+# Делаем через shell — community.general не имеет zpool-модуля.
+# Один shell-task per pool, внутри jinja-for по pool_properties dict.
+- name: 'zfs_tuning | Apply pool-level properties via `zpool set` (autotrim etc)'
+  ansible.builtin.shell: |
+    set -e
+    pool='{{ item.name }}'
+    {% for k, v in (item.pool_properties | default({})).items() %}
+    current=$(zpool get -H -o value '{{ k }}' "$pool")
+    if [ "$current" != '{{ v }}' ]; then
+      zpool set '{{ k }}={{ v }}' "$pool"
+      echo "changed: {{ k }} $current -> {{ v }}"
+    fi
+    {% endfor %}
+  register: zpool_set_result
+  changed_when: "'changed:' in zpool_set_result.stdout"
+  loop: "{{ zfs_tuning_pools }}"
+  loop_control:
+    label: "{{ item.name }}{% if item.pool_properties is defined %} pool_properties={{ item.pool_properties }}{% endif %}"
+  when: (item.pool_properties | default({})) | length > 0
+
+- name: 'zfs_tuning | Enable monthly scrub timer'
+  ansible.builtin.systemd:
+    name: "zfs-scrub-monthly@{{ item.name }}.timer"
+    enabled: true
+    state: started
+  loop: "{{ zfs_tuning_pools }}"
+  loop_control:
+    label: "{{ item.name }} — scrub={{ item.scrub | default('none') }}"
+  when: (item.scrub | default('none')) != 'none'
+
+- name: 'zfs_tuning | Disable scrub timer if explicitly set to none'
+  ansible.builtin.systemd:
+    name: "zfs-scrub-monthly@{{ item.name }}.timer"
+    enabled: false
+    state: stopped
+  loop: "{{ zfs_tuning_pools }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: (item.scrub | default('none')) == 'none'
+  failed_when: false  # timer мог не существовать
+
+- name: 'zfs_tuning | Enable monthly TRIM timer (only for pools with SSD)'
+  ansible.builtin.systemd:
+    name: "zfs-trim-monthly@{{ item.name }}.timer"
+    enabled: true
+    state: started
+  loop: "{{ zfs_tuning_pools }}"
+  loop_control:
+    label: "{{ item.name }} — trim={{ item.trim | default('none') }}"
+  when: (item.trim | default('none')) != 'none'

@@ -1,0 +1,10 @@
+---
+# Pool-level ZFS tuning: apply pool properties + enable scrub/trim systemd timers.
+#
+# Не управляет /etc/modprobe.d/zfs.conf — это делает role `linux_helper` через
+# linux_helper_zfs_{default,cluster,host}_options (см. group_vars/all/linux_helper/10_zfs.yml).
+# Не управляет ZED-hooks для уведомлений — это делает role `zfs-help` (zabbix-based)
+# либо role `prometheus_textfile_zfs` (prometheus-based).
+#
+# Требуется host_vars override `zfs_tuning_pools`. Если пустой — задача skip'нута.
+zfs_tuning_pools: []
