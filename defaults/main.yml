@@ -21,3 +21,11 @@ zfs_tuning_size_properties:
   - reservation
   - refreservation
 
+# Синонимы значений: OpenZFS 2.x хранит `acltype=posixacl` как `posix` и так же
+# его отдаёт, а community.general.zfs сравнивает строки буквально — без замены
+# posixacl давал changed на каждом прогоне. Пишем в host_vars привычное, роль
+# сравнивает и ставит каноническое.
+zfs_tuning_value_aliases:
+  acltype:
+    posixacl: posix
+

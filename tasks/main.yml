@@ -22,7 +22,7 @@
       {%- if k in zfs_tuning_size_properties and (v | string) is match('^[0-9.]+[KMGTPkmgtp]$') -%}
       {%- set _ = out.update({k: (v | string | upper | human_to_bytes) | string}) -%}
       {%- else -%}
-      {%- set _ = out.update({k: v | string}) -%}
+      {%- set _ = out.update({k: zfs_tuning_value_aliases.get(k, {}).get(v | string, v | string)}) -%}
       {%- endif -%}
       {%- endfor -%}
       {{ out }}
@@ -65,7 +65,7 @@
       {%- if k in zfs_tuning_size_properties and (v | string) is match('^[0-9.]+[KMGTPkmgtp]$') -%}
       {%- set _ = out.update({k: (v | string | upper | human_to_bytes) | string}) -%}
       {%- else -%}
-      {%- set _ = out.update({k: v | string}) -%}
+      {%- set _ = out.update({k: zfs_tuning_value_aliases.get(k, {}).get(v | string, v | string)}) -%}
       {%- endif -%}
       {%- endfor -%}
       {{ out }}
