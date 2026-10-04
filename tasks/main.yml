@@ -16,7 +16,16 @@
   community.general.zfs:
     name: "{{ item.name }}"
     state: present
-    extra_zfs_properties: "{{ item.properties | default({}) }}"
+    extra_zfs_properties: >-
+      {%- set out = {} -%}
+      {%- for k, v in (item.properties | default({})).items() -%}
+      {%- if k in zfs_tuning_size_properties and (v | string) is match('^[0-9.]+[KMGTPkmgtp]$') -%}
+      {%- set _ = out.update({k: (v | string | upper | human_to_bytes) | string}) -%}
+      {%- else -%}
+      {%- set _ = out.update({k: v | string}) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
   loop: "{{ zfs_tuning_pools }}"
   loop_control:
     label: "{{ item.name }}"
@@ -42,6 +51,27 @@
   loop_control:
     label: "{{ item.name }}{% if item.pool_properties is defined %} pool_properties={{ item.pool_properties }}{% endif %}"
   when: (item.pool_properties | default({})) | length > 0
+
+# Датасеты пула: создаются, если их нет, и получают свои свойства. Роль ничего
+# не удаляет и не трогает датасеты, которых нет в списке. Сортировка по имени
+# ставит родителя раньше потомков (repo < repo/arch), порядок в host_vars не важен.
+- name: 'zfs_tuning | Datasets — create if missing, apply properties'
+  community.general.zfs:
+    name: "{{ item.0.name }}/{{ item.1.name }}"
+    state: present
+    extra_zfs_properties: >-
+      {%- set out = {} -%}
+      {%- for k, v in (item.1.properties | default({})).items() -%}
+      {%- if k in zfs_tuning_size_properties and (v | string) is match('^[0-9.]+[KMGTPkmgtp]$') -%}
+      {%- set _ = out.update({k: (v | string | upper | human_to_bytes) | string}) -%}
+      {%- else -%}
+      {%- set _ = out.update({k: v | string}) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+  loop: "{{ zfs_tuning_pools | subelements('datasets', skip_missing=True) | sort(attribute='1.name') }}"
+  loop_control:
+    label: "{{ item.0.name }}/{{ item.1.name }}"
 
 - name: 'zfs_tuning | Enable monthly scrub timer'
   ansible.builtin.systemd:
