@@ -1,6 +1,6 @@
 # zfs_tuning
 
-Применяет ZFS pool/dataset properties через `community.general.zfs` (filesystem
+Применяет ZFS pool/dataset properties (и создаёт перечисленные датасеты) через `community.general.zfs` (filesystem
 level: `compression`, `atime`, `xattr`, `acltype`, `recordsize`) + pool-level
 через `zpool set` (`autotrim`). Дополнительно включает штатные systemd-таймеры:
 
@@ -42,7 +42,27 @@ zfs_tuning_pools:
       autotrim: 'on'             # для SSD pool'ов
     scrub: monthly               # monthly | none — enable systemd timer
     trim: monthly                # monthly | none — для SSD pool'ов
+    datasets:                    # необязательно
+      - name: repo               # путь относительно пула → <pool>/repo
+        properties:
+          canmount: 'off'
+          recordsize: 1M
+      - name: repo/arch          # без properties — просто создать
 ```
+
+### Датасеты
+
+* Датасет из списка создаётся, если его нет, и получает `properties`
+  (`zfs create` / `zfs set`). Свойства, которых нет в списке, наследуются.
+* Роль **ничего не удаляет**: датасеты не из списка и их свойства не трогаются.
+* Порядок в списке не важен — роль сортирует по имени, родитель идёт раньше
+  потомков (`repo` < `repo/arch`).
+* Свойства-размеры (`recordsize`, `volblocksize`, `special_small_blocks`,
+  `quota`, `refquota`, `reservation`, `refreservation` —
+  `zfs_tuning_size_properties`) можно писать как `1M` / `16K`: перед
+  сравнением роль переводит их в байты. `community.general.zfs` читает текущее
+  значение через `zfs get -p` (`1048576`), и без перевода `1M` считался бы
+  изменением на каждом прогоне. То же действует для `properties` самого пула.
 
 ## Примеры
 
